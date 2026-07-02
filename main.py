@@ -1,62 +1,53 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
-from lenstronomy.LensModel.lens_model import LensModel
-from lenstronomy.LightModel.light_model import LightModel
-from lenstronomy.Data.pixel_grid import PixelGrid
-from lenstronomy.Data.psf import PSF  # <-- 1. ADD THIS IMPORT
-from lenstronomy.ImSim.image_model import ImageModel
 
 
-def simulate_first_lens():
-    print("🌌 Starting Strong Lens Simulation...")
+def plot_simulated_lenses(num_to_display=4):
+    """Loads the generated dataset from data/raw/ and displays a grid of lens images."""
+    images_path = os.path.join('data', 'raw', 'lens_images.npy')
+    params_path = os.path.join('data', 'raw', 'lens_params.npy')
 
-    # 1. Define the Coordinate Grid (Our Camera Sensor)
-    num_pix = 100
-    delta_pix = 0.05
+    # 1. Check if the dataset files actually exist
+    if not os.path.exists(images_path) or not os.path.exists(params_path):
+        print("❌ Error: Dataset files not found. Run main.py first to generate data!")
+        return
 
-    kwargs_grid = {
-        'nx': num_pix, 'ny': num_pix,
-        'transform_pix2angle': np.array([[delta_pix, 0], [0, delta_pix]]),
-        'ra_at_xy_0': -(num_pix * delta_pix) / 2.0,
-        'dec_at_xy_0': -(num_pix * delta_pix) / 2.0
-    }
-    pixel_grid = PixelGrid(**kwargs_grid)
+    # 2. Load the arrays
+    images = np.load(images_path)
+    params = np.load(params_path)
 
-    # 2. Define an Empty PSF object (Fixes the AttributeError)
-    psf_class = PSF(psf_type='NONE')  # <-- 2. INITIALIZE CORECTLY HERE
+    print(f"📊 Loaded {len(images)} images for visualization.")
 
-    # 3. Define the Lens Model (The Foreground Mass / Galaxy)
-    lens_model_list = ['SIS']
-    lens_model = LensModel(lens_model_list=lens_model_list)
-    kwargs_lens = [{'theta_E': 1.2, 'center_x': 0.0, 'center_y': 0.0}]
+    # 3. Create a clean grid layout
+    fig, axes = plt.subplots(1, num_to_display, figsize=(4 * num_to_display, 4))
 
-    # 4. Define the Source Light Model (The Background Galaxy)
-    source_model_list = ['SERSIC']
-    source_light_model = LightModel(light_model_list=source_model_list)
-    kwargs_source = [{'amp': 100, 'R_sersic': 0.2, 'n_sersic': 1, 'center_x': 0.1, 'center_y': 0.1}]
+    # Handle the edge case where we only display 1 image
+    if num_to_display == 1:
+        axes = [axes]
 
-    # 5. Combine them into an Image Model simulator
-    # We pass our new psf_class instance here instead of None
-    image_model = ImageModel(data_class=pixel_grid, psf_class=psf_class,
-                             lens_model_class=lens_model, source_model_class=source_light_model)
+    for i in range(num_to_display):
+        # Grab individual parameters for the title
+        theta_E, center_x, center_y = params[i]
 
-    # 6. Generate the simulated lens image
-    image = image_model.image(kwargs_lens=kwargs_lens, kwargs_source=kwargs_source)
+        # Plot the matrix heatmap
+        im = axes[i].imshow(images[i], origin='lower', cmap='magma')
+        axes[i].set_title(f"Lens #{i + 1}\n$\\theta_E$: {theta_E:.2f} | X: {center_x:.2f}")
+        axes[i].axis('off')
 
-    # 7. Add some realistic cosmic background noise
-    noise = np.random.normal(loc=0, scale=1.0, size=image.shape)
-    image_with_noise = image + noise
+    # Add a global color bar to show pixel intensity scale
+    fig.subplots_adjust(right=0.85)
+    cbar_ax = fig.add_axes([0.88, 0.15, 0.02, 0.7])
+    fig.colorbar(im, cax=cbar_ax, label="Intensity")
 
-    # 8. Plot the Result!
-    plt.figure(figsize=(6, 6))
-    plt.imshow(image_with_noise, origin='lower', cmap='magma')
-    plt.title("Our First Simulated Gravitational Lens")
-    plt.colorbar(label="Intensity")
+    # Save a copy to your figures directory
+    os.makedirs('figures', exist_ok=True)
+    plt.savefig('figures/dataset_preview.png', bbox_inches='tight')
+    print("🎨 Preview grid saved to figures/dataset_preview.png")
 
-    plt.savefig('figures/my_first_lens.png')
-    print("✅ Success! Image saved to figures/my_first_lens.png")
+    # Show the pop-up window
     plt.show()
 
 
 if __name__ == "__main__":
-    simulate_first_lens()
+    plot_simulated_lenses(num_to_display=4)
